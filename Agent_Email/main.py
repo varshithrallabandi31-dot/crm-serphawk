@@ -36,7 +36,7 @@ from modules.llm_engine import analyze_content
 from modules.market_analyzer import analyze_market, match_services
 from modules.serp_hawk_email import generate_serp_hawk_email
 from modules.image_generator import generate_email_image
-from modules.email_sender import send_email_outlook
+from modules.email_sender import send_email_outlook, send_email_resend
 
 # Load environment variables
 load_dotenv()
@@ -48,6 +48,11 @@ OUTLOOK_EMAIL = os.getenv('OUTLOOK_EMAIL')
 OUTLOOK_PASSWORD = os.getenv('OUTLOOK_PASSWORD')
 SMTP_SERVER = os.getenv('SMTP_SERVER', 'smtp.gmail.com')
 SMTP_PORT = int(os.getenv('SMTP_PORT', '587'))
+
+# Email Service Configuration
+EMAIL_MODE = os.getenv('EMAIL_MODE', 'resend')  # 'resend' or 'smtp'
+RESEND_API_KEY = os.getenv('RESEND_API_KEY')
+
 
 # Create output directories
 os.makedirs('static/generated_images', exist_ok=True)
@@ -291,9 +296,19 @@ async def send_lead(
         normalized_url = website_url.strip().lower()
         check_outreach_eligibility(session, normalized_url)
 
-        # Send Email
-        if OUTLOOK_EMAIL and OUTLOOK_PASSWORD:
-            print(f"Sending email to {to_email} via Outlook...")
+        # Send Email - Use Resend API or SMTP based on EMAIL_MODE
+        if EMAIL_MODE == 'resend' and RESEND_API_KEY:
+            print(f"Sending email to {to_email} via Resend API...")
+            await run_in_threadpool(
+                send_email_resend,
+                to_email=to_email,
+                subject=subject,
+                body=body_html,
+                sender_email=SENDER_EMAIL,
+                html=True
+            )
+        elif OUTLOOK_EMAIL and OUTLOOK_PASSWORD:
+            print(f"Sending email to {to_email} via SMTP...")
             await run_in_threadpool(
                 send_email_outlook,
                 to_email=to_email,
@@ -307,6 +322,7 @@ async def send_lead(
             )
         else:
              print(f"SIMULATING email to {to_email}: {subject}")
+
 
         # DB Operations (Create Company + Log)
         # Check if company exists first
@@ -511,17 +527,29 @@ async def send_email_api(data: dict, session: Session = Depends(get_session)):
              return JSONResponse({'success': False, 'error': 'Hourly rate limit exceeded'}, status_code=429)
 
         # Send Email
-        await run_in_threadpool(
-            send_email_outlook,
-            to_email=email_data['to_email'],
-            subject=email_data['subject'],
-            body=email_data['body'],
-            sender_email=sender_email,
-            sender_password=sender_password,
-            smtp_server=SMTP_SERVER,
-            smtp_port=SMTP_PORT,
-            html=True
-        )
+        if EMAIL_MODE == 'resend' and RESEND_API_KEY:
+            print(f"Sending email via Resend API to {email_data['to_email']}...")
+            await run_in_threadpool(
+                send_email_resend,
+                to_email=email_data['to_email'],
+                subject=email_data['subject'],
+                body=email_data['body'],
+                sender_email=SENDER_EMAIL,
+                html=True
+            )
+        else:
+            # Fallback to SMTP
+            await run_in_threadpool(
+                send_email_outlook,
+                to_email=email_data['to_email'],
+                subject=email_data['subject'],
+                body=email_data['body'],
+                sender_email=sender_email,
+                sender_password=sender_password,
+                smtp_server=SMTP_SERVER,
+                smtp_port=SMTP_PORT,
+                html=True
+            )
         
         # Log to DB
         # We might not have a Company ID if it came from the AI tool randomly.

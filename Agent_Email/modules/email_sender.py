@@ -1,6 +1,7 @@
 import smtplib
 import imaplib
 import time
+import os
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 
@@ -69,6 +70,57 @@ def save_to_sent(to_email, msg, sender_email, sender_password, imap_server, imap
         mail.logout()
     except Exception as e:
         print(f"❌ Failed to save copy to Sent folder: {e}")
+
+
+def send_email_resend(to_email, subject, body, sender_email, html=True, cc_emails=None):
+    """
+    Sends an email using Resend API.
+    Requires RESEND_API_KEY environment variable.
+    """
+    try:
+        import resend
+    except ImportError:
+        raise ImportError("Resend package not installed. Run: pip install resend")
+    
+    # Use default CCs if not provided
+    if cc_emails is None:
+        cc_emails = DEFAULT_CC_EMAILS
+    
+    # Get API key from environment
+    api_key = os.getenv('RESEND_API_KEY')
+    if not api_key:
+        raise ValueError("RESEND_API_KEY not found in environment variables")
+    
+    resend.api_key = api_key
+    
+    try:
+        print(f"Sending email via Resend API to {to_email}...")
+        
+        # Prepare email parameters
+        params = {
+            "from": sender_email,
+            "to": [to_email],
+            "subject": subject,
+        }
+        
+        # Add CC if provided
+        if cc_emails:
+            params["cc"] = cc_emails
+        
+        # Add body (HTML or plain text)
+        if html:
+            params["html"] = body
+        else:
+            params["text"] = body
+        
+        # Send email
+        response = resend.Emails.send(params)
+        print(f"✓ Email sent successfully via Resend! ID: {response.get('id', 'N/A')}")
+        return True
+        
+    except Exception as e:
+        print(f"Failed to send email via Resend: {e}")
+        raise e
 
 def send_email_outlook(to_email, subject, body, sender_email, sender_password, smtp_server='smtp.office365.com', smtp_port=587, html=True, cc_emails=None):
     """

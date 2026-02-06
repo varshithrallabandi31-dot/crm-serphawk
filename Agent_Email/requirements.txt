@@ -24,4 +24,7 @@ python-multipart==0.0.6
 
 # Additional utilities
 httpx==0.26.0
+
+# Email Service (for Railway deployment)
+resend==2.0.0
 # Duplicates removed
