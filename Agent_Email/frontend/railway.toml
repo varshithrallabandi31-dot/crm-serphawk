@@ -3,3 +3,6 @@ builder = "NIXPACKS"
 
 [deploy]
 startCommand = "npm start"
+
+[nixpacks]
+nodeVersion = "20"
