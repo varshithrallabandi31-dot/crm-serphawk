@@ -122,6 +122,53 @@ def send_email_resend(to_email, subject, body, sender_email, html=True, cc_email
         print(f"Failed to send email via Resend: {e}")
         raise e
 
+
+def send_email_sendgrid(to_email, subject, body, sender_email, html=True, cc_emails=None):
+    """
+    Sends an email using SendGrid API.
+    Requires SENDGRID_API_KEY environment variable.
+    """
+    try:
+        from sendgrid import SendGridAPIClient
+        from sendgrid.helpers.mail import Mail, Email, To, Content, Cc
+    except ImportError:
+        raise ImportError("SendGrid package not installed. Run: pip install sendgrid")
+    
+    # Use default CCs if not provided
+    if cc_emails is None:
+        cc_emails = DEFAULT_CC_EMAILS
+    
+    # Get API key from environment
+    api_key = os.getenv('SENDGRID_API_KEY')
+    if not api_key:
+        raise ValueError("SENDGRID_API_KEY not found in environment variables")
+    
+    try:
+        print(f"Sending email via SendGrid API to {to_email}...")
+        
+        # Create message
+        message = Mail(
+            from_email=Email(sender_email),
+            to_emails=To(to_email),
+            subject=subject,
+            html_content=Content("text/html", body) if html else Content("text/plain", body)
+        )
+        
+        # Add CC if provided
+        if cc_emails:
+            message.cc = [Cc(email) for email in cc_emails]
+        
+        # Send email
+        sg = SendGridAPIClient(api_key)
+        response = sg.send(message)
+        
+        print(f"✓ Email sent successfully via SendGrid! Status: {response.status_code}")
+        return True
+        
+    except Exception as e:
+        print(f"Failed to send email via SendGrid: {e}")
+        raise e
+
 def send_email_outlook(to_email, subject, body, sender_email, sender_password, smtp_server='smtp.office365.com', smtp_port=587, html=True, cc_emails=None):
     """
     Sends an email using SMTP.

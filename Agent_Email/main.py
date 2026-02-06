@@ -36,7 +36,7 @@ from modules.llm_engine import analyze_content
 from modules.market_analyzer import analyze_market, match_services
 from modules.serp_hawk_email import generate_serp_hawk_email
 from modules.image_generator import generate_email_image
-from modules.email_sender import send_email_outlook, send_email_resend
+from modules.email_sender import send_email_outlook, send_email_resend, send_email_sendgrid
 
 # Load environment variables
 load_dotenv()
@@ -50,8 +50,9 @@ SMTP_SERVER = os.getenv('SMTP_SERVER', 'smtp.gmail.com')
 SMTP_PORT = int(os.getenv('SMTP_PORT', '587'))
 
 # Email Service Configuration
-EMAIL_MODE = os.getenv('EMAIL_MODE', 'resend')  # 'resend' or 'smtp'
+EMAIL_MODE = os.getenv('EMAIL_MODE', 'resend')  # 'resend', 'sendgrid', or 'smtp'
 RESEND_API_KEY = os.getenv('RESEND_API_KEY')
+SENDGRID_API_KEY = os.getenv('SENDGRID_API_KEY')
 
 
 # Create output directories
@@ -296,8 +297,18 @@ async def send_lead(
         normalized_url = website_url.strip().lower()
         check_outreach_eligibility(session, normalized_url)
 
-        # Send Email - Use Resend API or SMTP based on EMAIL_MODE
-        if EMAIL_MODE == 'resend' and RESEND_API_KEY:
+        # Send Email - Priority: SendGrid > Resend > SMTP
+        if EMAIL_MODE == 'sendgrid' and SENDGRID_API_KEY:
+            print(f"Sending email to {to_email} via SendGrid API...")
+            await run_in_threadpool(
+                send_email_sendgrid,
+                to_email=to_email,
+                subject=subject,
+                body=body_html,
+                sender_email=SENDER_EMAIL,
+                html=True
+            )
+        elif EMAIL_MODE == 'resend' and RESEND_API_KEY:
             print(f"Sending email to {to_email} via Resend API...")
             await run_in_threadpool(
                 send_email_resend,
@@ -526,8 +537,18 @@ async def send_email_api(data: dict, session: Session = Depends(get_session)):
         if emails_sent_count >= HOURLY_EMAIL_LIMIT:
              return JSONResponse({'success': False, 'error': 'Hourly rate limit exceeded'}, status_code=429)
 
-        # Send Email
-        if EMAIL_MODE == 'resend' and RESEND_API_KEY:
+        # Send Email - Priority: SendGrid > Resend > SMTP
+        if EMAIL_MODE == 'sendgrid' and SENDGRID_API_KEY:
+            print(f"Sending email via SendGrid API to {email_data['to_email']}...")
+            await run_in_threadpool(
+                send_email_sendgrid,
+                to_email=email_data['to_email'],
+                subject=email_data['subject'],
+                body=email_data['body'],
+                sender_email=SENDER_EMAIL,
+                html=True
+            )
+        elif EMAIL_MODE == 'resend' and RESEND_API_KEY:
             print(f"Sending email via Resend API to {email_data['to_email']}...")
             await run_in_threadpool(
                 send_email_resend,
