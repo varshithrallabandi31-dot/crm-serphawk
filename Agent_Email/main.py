@@ -111,9 +111,8 @@ app.add_middleware(
     allow_origins=[
         "http://localhost:3000",  # Local development
         "https://crm-serphawk-production.up.railway.app",  # Railway backend (self)
-        # Add your Vercel frontend URL after deployment, or use wildcard for Vercel:
-        # "https://your-app-name.vercel.app",
-        # "https://your-app-name-*.vercel.app",  # For preview deployments
+        "https://crm-serphawk.vercel.app",  # Vercel production frontend
+        "https://crm-serphawk-*.vercel.app",  # Vercel preview deployments
     ],
     allow_credentials=True,
     allow_methods=["*"],
